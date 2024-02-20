@@ -30,6 +30,9 @@ public class EbcdicToJson {
 	private final String OPEN_BRACE = "{";
 	private final String CLOSE_BRACE = "{";
 	private final ResponseAbendError abendError;
+	public static final String COMP_3_4="140";
+	public static final String COMP_3_3="31";
+	public static final String COMP_3_5="141";
 
 	private EbcdicToJson(ResponseAbendError abendError) {
 		this.abendError = abendError;
@@ -365,7 +368,7 @@ public class EbcdicToJson {
 				&& !value.isFieldPresent()) {
 			return "";
 		} else {
-			return value.asString();
+		return value.asString();
 		}
 	}
 }
