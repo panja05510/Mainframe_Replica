@@ -2,6 +2,7 @@ package com.example.mq.services;
 
 import com.ibm.as400.access.AS400PackedDecimal;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionMessage.ItemsBuilder;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
 import net.sf.JRecord.JRecordInterface1;
@@ -26,9 +28,31 @@ import net.sf.cb2xml.analysis.ItemBuilder;
 import net.sf.cb2xml.sablecc.node.ABlankWhenZeroClause;
 import net.sf.cb2xml.sablecc.node.Switch;
 
+@Component
 public class JsonToEbcdic {
 	
-	private final int ZERO = 0;
+	public static final String BLANK = " ";
+	public static final String ZERO = "0";
+	public static final String OPEN_BRACE = "{";
+	public static final String CLOSE_BRACE = "}";
+	
+	public static final int CHAR_TYPE = 0;
+	public static final int MAX_SHORT_SIZE = 4;
+	public static final int MAX_INT_SIZE = 9;
+	public static final int V907_TYPE = 22;
+	public static final int NUMB_TYPE = 25;
+	public static final int COMP_TYPE = 142;
+	public static final int SIGNED_NUMB_TYPE = 152;
+	public static final int COMP_3_4_TYPE = 31;
+	public static final int COMP_3_3_TYPE = 140;
+	public static final int COMP_3_5_TYPE = 141;
+	
+	public static final String COMP_3_4 = "31";
+	public static final String COMP_3_3 = "140";
+	public static final String COMP_3_5 = "141";
+	
+	public static final String LATIN_1_CHARSET = "ISO-8859-1";
+	public static final String EBCDIC_CHARSET = String.format("CP%s", "500");
 	private final HashMap<String, String> cobolNameValueMap;
 	private final List<String> leaveAsHexFieldnameList;
 	
@@ -44,6 +68,7 @@ public class JsonToEbcdic {
 	* **********************************/
 	
 	public byte[] request2mainframe(String copybook) {
+		System.out.println("constcutor called");
 		ArrayList<HashMap<String,String>> intermediate_map = copybookToIntermediate(copybook);
 		return getFixedLengthOutput(intermediate_map);
 	}
@@ -53,6 +78,7 @@ public class JsonToEbcdic {
 	*************************************************************/
 	public ArrayList<HashMap<String, String>> copybookToIntermediate(String copybookName)
 	{
+		System.out.println("copybookToIntermediate() called");
 		try {
 			ClassPathResource resource = new ClassPathResource(copybookName);
 			InputStream inputStream = resource.getInputStream();
@@ -63,6 +89,7 @@ public class JsonToEbcdic {
 		}
 		catch(Exception e) {
 			System.out.println("error occured at JsonToEbcdic-->copybookToIntermedaite()" + e);
+			return null;
 		}
 	}
 	
@@ -175,7 +202,7 @@ public class JsonToEbcdic {
 			ExternalConversion.getTypeAsString(0, 31);
 			switch (typeId){
 			case CHAR_TYPE: {
-				valueToAdd.append(ABlankWhenZeroClause.repeat(Math.max(0, storageLength)));
+				valueToAdd.append(BLANK.repeat(Math.max(0, storageLength)));
 				break;
 			}
 			case SIGNED_NUMB_TYPE:
@@ -220,19 +247,10 @@ public class JsonToEbcdic {
 							}
 							fixedOutputEbcdic.append(builder.toString());
 						} else {
-							fixedOutputEbcdic.append( convertFormat(cobolValue, LATIN_1_CHARSET, EBCDIC_CHARSET) );
+							fixedOutputEbcdic.append( convertFormat(cobolvalue, LATIN_1_CHARSET, EBCDIC_CHARSET) );
 						}
 						break;
 					}
-					case COMP_TYPE:
-						String bytesSizeStr = pic.substring(pic.indexOf("(")+1,pic.indexOf(")")).trim();
-						int bytesSize = Integer.parseInt(bytesSizeStr);
-						
-						if(bytesSize <= MAX_SHORT_SIZE) {
-							int value = Integer.parseInt(cobolvalue);
-							fixedOutputEbcdic.append(new String(longToBytes(value)));
-						}
-						break;
 					case COMP_TYPE:
 						String bytesSizeStr = pic.substring(pic.indexOf("(")+1,pic.indexOf(")")).trim();
 						int bytesSize = Integer.parseInt(bytesSizeStr);
@@ -264,8 +282,9 @@ public class JsonToEbcdic {
 				}
 			}
 			return fixedOutputEbcdic.toString().getBytes(LATIN_1_CHARSET);
-		} catch(NumberFormatException ex) {
+		} catch(Exception ex) {
 			System.out.println("number format exception at JsonToEbcdic"+ex);
+			return null;
 		}
 	}
 	
