@@ -88,8 +88,8 @@ public class JsonToEbcdic {
 			return getIntermediateList(root,new ArrayList<>(), new HashMap<>());
 		}
 		catch(Exception e) {
-			System.out.println("error occured at JsonToEbcdic-->copybookToIntermedaite()" + e);
-			return null;
+			System.out.println("error occured at JsonToEbcdic-->copybookToIntermedaite()" + e.getMessage());
+			return null; 
 		}
 	}
 	

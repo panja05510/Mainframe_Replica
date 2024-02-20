@@ -14,11 +14,16 @@ public class Simulator {
 	@Autowired
 	private JsonToEbcdic j2e;
 	
-	private String cobolFile = "resources/customer.cpy";
+	private String cobolFile = "customer.cpy";
 	
 	@GetMapping("send")
 	public byte[] jsonToEbcdic() {
 		return j2e.request2mainframe(cobolFile);
+	}
+	
+	@GetMapping("test")
+	public String temp() {
+		return "hello world";
 	}
 	
 }
