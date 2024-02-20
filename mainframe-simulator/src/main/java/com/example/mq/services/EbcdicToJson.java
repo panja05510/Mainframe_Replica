@@ -1,7 +1,9 @@
 package com.example.mq.services;
 
 import com.example.mq.messaginglibrary.ResponseAbendError;
-import com.example.mq.model.ResponseBaseModel;
+import com.example.mq.messaginglibrary.ResponseBaseModel;
+import com.example.mq.messaginglibrary.ResponseCBLModel;
+import com.example.mq.messaginglibrary.ResponseErrorModel;
 import com.google.gson.*;
 import net.minidev.json.JSONValue;
 import net.sf.JRecord.*;
@@ -54,6 +56,7 @@ public class EbcdicToJson {
 			return responseOrError;
 		} catch (Exception e) {
 			System.err.println("error accured during parsing Ebcdic To JSON :");
+			return null;
 
 		}
 
@@ -65,7 +68,7 @@ public class EbcdicToJson {
 
 	private JsonObject getResponseOrError(String ebcdicLength, Map<String, Map<String, String>> copybooks,
 			IItemDetails root, LayoutDetail layout, AbstractLine line, ResponseBaseModel responseBaseModel) {
-		ResponseCBModel rcm = responseBaseModel.getCobolfieldsmap();
+		ResponseCBLModel rcm = responseBaseModel.getCobolfieldsmap();
 		Map<String, String> leavesMap = rcm.getLeaves();
 		List<String> parentsFieldsList = rcm.getParents();
 		List<String> asHexFieldsList = rcm.getHexFields();
@@ -79,7 +82,7 @@ public class EbcdicToJson {
 		}
 //		
 
-		ResponseErrorMode responseErrorModel = responseBaseModel.getError();
+		ResponseErrorModel responseErrorModel = responseBaseModel.getError();
 		final var returnCode = "returnCode";
 		Map<String, String> errorFields = responseErrorModel.getErrorFieldnameMapping();
 
@@ -92,7 +95,7 @@ public class EbcdicToJson {
 			}
 		}
 		// ABEND errors
-		if (ebcdicLength.equals(abendError.getCopyBookLength())) {
+		if (ebcdicLength.equals(abendError.getCopybookLength())) {
 			error = getAbendErrorPayload(layout, line);
 			response.add("error", error);
 		}
@@ -123,12 +126,13 @@ public class EbcdicToJson {
 	 *******************************************************************************************/
 
 	public String getCopybookName(String ebcdicLength, Map<String, Map<String, String>> copybooks) {
-		String copybookName;
+		String copybookName = null;
 		if (ebcdicLength.equals(abendError.getCopybookLength()))
 			copybookName = abendError.getCopybook();
 
 		else if (copybooks.containsKey(ebcdicLength))
 			copybookName = copybooks.get("default").get("copybookName");
+		
 		return copybookName;
 	}
 
@@ -230,7 +234,7 @@ public class EbcdicToJson {
 
 	/*******************************************************************************************
 	 * Get TSMDA Error payload
-	 */
+	 *********************************************************************************************/
 	public JsonObject getTSMDAErrorPayload(LayoutDetail layout, AbstractLine line,
 			ResponseBaseModel responseBaseModel) {
 		ResponseErrorModel rem = responseBaseModel.getError();
@@ -357,7 +361,7 @@ public class EbcdicToJson {
 
 	private String getValuesString(IFieldValue value) {
 		String valueType = value.getTypeName();
-		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMPU_3_5.equals(valueType))
+		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
 				&& !value.isFieldPresent()) {
 			return "";
 		} else {
