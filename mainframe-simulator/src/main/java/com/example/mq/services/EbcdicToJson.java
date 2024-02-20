@@ -60,64 +60,63 @@ public class EbcdicToJson {
 	}
 
 	/*************************************************************************************
-	   8 Call error method or regular parsing method based on MF response length
+	 * 8 Call error method or regular parsing method based on MF response length
 	 */
 
 	private JsonObject getResponseOrError(String ebcdicLength, Map<String, Map<String, String>> copybooks,
 			IItemDetails root, LayoutDetail layout, AbstractLine line, ResponseBaseModel responseBaseModel) {
-		ResponseCBModel rcm =responseBaseModel.getCobolfieldsmap();
-		Map<String, String> leavesMap=rcm.getLeaves();
-		List<String> parentsFieldsList=rcm.getParents();
-		List<String> asHexFieldsList=rcm.getHexFields()	;
-		
-		JsonObject response =new JsonObject();
+		ResponseCBModel rcm = responseBaseModel.getCobolfieldsmap();
+		Map<String, String> leavesMap = rcm.getLeaves();
+		List<String> parentsFieldsList = rcm.getParents();
+		List<String> asHexFieldsList = rcm.getHexFields();
+
+		JsonObject response = new JsonObject();
 		JsonObject error;
-		String responseType=copybooks.get(ebcdicLength).get("responseType");
-		
-		if(copybooks.containsKey(ebcdicLength)) {
-			responseType=copybooks.get(ebcdicLength).get("responseType");
+		String responseType = copybooks.get(ebcdicLength).get("responseType");
+
+		if (copybooks.containsKey(ebcdicLength)) {
+			responseType = copybooks.get(ebcdicLength).get("responseType");
 		}
 //		
 
-		ResponseErrorMode responseErrorModel =responseBaseModel.getError();
-		final var returnCode="returnCode";
-		Map<String , String> errorFields=responseErrorModel.getErrorFieldnameMapping();
-		
-		if(errorFields.containsKey(returnCode)&& layout.getFieldNameMap().containsKey(errorFields.get(returnCode))) {
-			if("0".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
-				responseType="success";
-				
-			}
-			else if("2".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
-				responseType="error";
+		ResponseErrorMode responseErrorModel = responseBaseModel.getError();
+		final var returnCode = "returnCode";
+		Map<String, String> errorFields = responseErrorModel.getErrorFieldnameMapping();
+
+		if (errorFields.containsKey(returnCode) && layout.getFieldNameMap().containsKey(errorFields.get(returnCode))) {
+			if ("0".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
+				responseType = "success";
+
+			} else if ("2".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
+				responseType = "error";
 			}
 		}
-		//ABEND errors
-		if(ebcdicLength.equals(abendError.getCopyBookLength())) {
-			error =getAbendErrorPayload(layout,line);
+		// ABEND errors
+		if (ebcdicLength.equals(abendError.getCopyBookLength())) {
+			error = getAbendErrorPayload(layout, line);
 			response.add("error", error);
 		}
-		//if response type contains error it calls responseErrorFormatter service and allocates TSMDA Errors
-		else if(responseType.equals("error")) {  //TSMDA errors
-			if(errorFields.containsKey("messageSeverity")&& layout.getFieldNameMap().containsKey(errorFields.get("messageSeverity"))) {
-			String mfResponseVal=line.getFieldValue(errorFields.get("messageSeverity")).asString();
-			if(StringUtils.equalsIgnoreCase("I",mfResponseVal)) {
-				response=getResponseJson(leavesMap,parentsFieldsList,asHexFieldsList,root, layout,line);
-				
-			}
-			else {
-				error=getTSMDAErrorPayload(layout , line, responseBaseModel);
+		// if response type contains error it calls responseErrorFormatter service and
+		// allocates TSMDA Errors
+		else if (responseType.equals("error")) { // TSMDA errors
+			if (errorFields.containsKey("messageSeverity")
+					&& layout.getFieldNameMap().containsKey(errorFields.get("messageSeverity"))) {
+				String mfResponseVal = line.getFieldValue(errorFields.get("messageSeverity")).asString();
+				if (StringUtils.equalsIgnoreCase("I", mfResponseVal)) {
+					response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root, layout, line);
+
+				} else {
+					error = getTSMDAErrorPayload(layout, line, responseBaseModel);
+					response.add("error", error);
+				}
+			} else {
+				error = getTSMDAErrorPayload(layout, line, responseBaseModel);
 				response.add("error", error);
 			}
-			}
-			else {
-				error=getTSMDAErrorPayload(layout , line, responseBaseModel);
-				response.add("error", error);
-			}
-			}
-			else response=getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList,root,layout,line);
-			return response;
-		}
+		} else
+			response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root, layout, line);
+		return response;
+	}
 
 	/*************************************************************************************
 	 * GET APPROPRIATE COPYBOOK BASED ON RESPONSE LENGTH
@@ -228,140 +227,141 @@ public class EbcdicToJson {
 
 		return error;
 	}
+
 	/*******************************************************************************************
 	 * Get TSMDA Error payload
 	 */
-	public JsonObject getTSMDAErrorPayload(LayoutDetail layout, AbstractLine line ,ResponseBaseModel responseBaseModel) {
-		ResponseErrorModel rem=responseBaseModel.getError();
-		
-		Map<String,String> errorFields=rem.getErrorFieldnameMapping();
-		JsonObject error=new JsonObject();
-		
-		for(String errorFieldAlias : errorFields.keySet()) {
-			String errorField =errorFields.get(errorFieldAlias);
-			JsonArray allValuesForErrorField=new JsonArray();
-			String errorFieldOcc= String.format("%s(0)", errorField);
-			
-			//if only one occurance of error field in copybook(i.e no OCCURS)
-			//e.g. TSMDA-OCCURANCE-IN-PROC
-			if(layout.getFieldNameMap().containsKey(errorField)) {
-				String mfResponseVal=line.getFieldValue(errorField).asString();
+	public JsonObject getTSMDAErrorPayload(LayoutDetail layout, AbstractLine line,
+			ResponseBaseModel responseBaseModel) {
+		ResponseErrorModel rem = responseBaseModel.getError();
+
+		Map<String, String> errorFields = rem.getErrorFieldnameMapping();
+		JsonObject error = new JsonObject();
+
+		for (String errorFieldAlias : errorFields.keySet()) {
+			String errorField = errorFields.get(errorFieldAlias);
+			JsonArray allValuesForErrorField = new JsonArray();
+			String errorFieldOcc = String.format("%s(0)", errorField);
+
+			// if only one occurance of error field in copybook(i.e no OCCURS)
+			// e.g. TSMDA-OCCURANCE-IN-PROC
+			if (layout.getFieldNameMap().containsKey(errorField)) {
+				String mfResponseVal = line.getFieldValue(errorField).asString();
 				allValuesForErrorField.add(mfResponseVal);
 				error.add(errorFieldAlias, allValuesForErrorField);
-				
+
 			}
-			
-			//e.g. if TSMDA-OCCURANCE-IN-PROC (0) exists in copybook
+
+			// e.g. if TSMDA-OCCURANCE-IN-PROC (0) exists in copybook
 			else if (layout.getFieldNameMap().containsKey(errorFieldOcc)) {
-				int occurance =0;
-				while(layout.getFieldNameMap().containsKey(errorFieldOcc)) {
-					String mfResponseVal=line.getFieldValue(errorFieldOcc).asString();	
+				int occurance = 0;
+				while (layout.getFieldNameMap().containsKey(errorFieldOcc)) {
+					String mfResponseVal = line.getFieldValue(errorFieldOcc).asString();
 					allValuesForErrorField.add(mfResponseVal);
-					errorFieldOcc=String.format("%s (%d)", errorField,++occurance);
+					errorFieldOcc = String.format("%s (%d)", errorField, ++occurance);
 				}
 				error.add(errorFieldAlias, allValuesForErrorField);
-				
+
 			}
-			
+
 		}
 		return error;
 	}
+
 	/************************************************************************************************
-	 * 	CORRECT JSON STRING
+	 * CORRECT JSON STRING
 	 **************************************************************************************/
-	
+
 	public String correctResponseString(String jsonStringToCorrect) {
-		jsonStringToCorrect =jsonStringToCorrect.replaceAll(",}", "}");
-		jsonStringToCorrect=jsonStringToCorrect.replaceAll(",]","]");
+		jsonStringToCorrect = jsonStringToCorrect.replaceAll(",}", "}");
+		jsonStringToCorrect = jsonStringToCorrect.replaceAll(",]", "]");
 		return jsonStringToCorrect;
 	}
-	
+
 	/*************************************************************************************************************
 	 * added this implementation in order to get response values from mainframe
 	 ********************************************************************************/
 
-private String getDuplicateFieldValues(Map<String, String> leavesMap, IItemDetails items, String fieldName, HashMap<String,Integer> fieldDuplicates, AbstractLine ab, String responseString, List<String> asHexFieldsList) {
-	if(leavesMap.containsKey(fieldName))
-	{
-		
-		IFieldValue value;
-		String fieldNameDuplicate=null;
-		
-		//if fieldname has already been added to map, increase occurance by 1
-		if(fieldDuplicates.containsKey(fieldName)) {
-			int fieldNameOccurance=fieldDuplicates.get(fieldName)+1;
-			fieldDuplicates.put(fieldName, fieldNameOccurance);
-			
-			//string
-			IArray2Dimension twoDimensionalArray= items.getArrayDefinition().asTwoDimensionArray();
-			IArray1Dimension oneDimensionalArray= items.getArrayDefinition().asOneDimensionArray();
-			IArray3Dimension threeDimensionalArray= items.getArrayDefinition().asThreeDimensionArray();
-			if(oneDimensionalArray!=null) {
-				fieldNameDuplicate=items.getArrayDefinition().getField(fieldNameOccurance).getName();
-				}
-			if(twoDimensionalArray!=null) {
-				int j=twoDimensionalArray.getArrayLength(1);
-				int k=fieldNameOccurance/j;
-				int l=(fieldNameOccurance)/j;
-				fieldNameDuplicate=twoDimensionalArray.get(k, l).getName();
-			}
-			if(threeDimensionalArray!=null) {
-				int i=threeDimensionalArray.getArrayLength(1)*threeDimensionalArray.getArrayLength(2);
-				int j=threeDimensionalArray.getArrayLength(2);
-				int k=fieldNameOccurance/i;
-				int l=(fieldNameOccurance%i)/j;
-				int m= fieldNameOccurance%j;
-				
-				fieldNameDuplicate=threeDimensionalArray.get(k, l, m).getName();
-				
-			}
-			
-			value = ab.getFieldValue(fieldNameDuplicate);
-		}
-		else {
-			fieldDuplicates.put(fieldName, 0);
-			
-			//if filename(1) exits
-			if(items.getItemType().isArray) {
-				String leafFieldName=items.getArrayDefinition().getField(0).getName();
-				value =ab.getFieldValue(leafFieldName);
-			} else {
-				value=ab.getFieldValue(fieldName);
-				
-			}
-		}
-		
-		//Append to Response JSON String
-		String fieldNameQuotes=String.format("\"%s\"", leavesMap.get(fieldName));
-		String valueAsString =getValuesString(value);
-		
-		String valueQuotes= String.format("\"%s\"", JSONValue.escape(valueAsString));
-		
-		if(asHexFieldsList!=null && asHexFieldsList.contains(fieldName)) {
-			String realHexQuotes= String.format("\"%s\"", value.asHex());
-			responseString+=String.format("%s:%s,",fieldNameQuotes,valueQuotes);
-			
-		} else {
-			responseString+=String.format("%s:%s", fieldNameQuotes,valueQuotes);
-		}
-	}
-	return responseString;
-	
-}
+	private String getDuplicateFieldValues(Map<String, String> leavesMap, IItemDetails items, String fieldName,
+			HashMap<String, Integer> fieldDuplicates, AbstractLine ab, String responseString,
+			List<String> asHexFieldsList) {
+		if (leavesMap.containsKey(fieldName)) {
 
-/************************************************************************************
- * 	CONVERT MAINFRAME COBOL VALUE TO STRING
- ************************************************************************************/
+			IFieldValue value;
+			String fieldNameDuplicate = null;
+
+			// if fieldname has already been added to map, increase occurance by 1
+			if (fieldDuplicates.containsKey(fieldName)) {
+				int fieldNameOccurance = fieldDuplicates.get(fieldName) + 1;
+				fieldDuplicates.put(fieldName, fieldNameOccurance);
+
+				// string
+				IArray2Dimension twoDimensionalArray = items.getArrayDefinition().asTwoDimensionArray();
+				IArray1Dimension oneDimensionalArray = items.getArrayDefinition().asOneDimensionArray();
+				IArray3Dimension threeDimensionalArray = items.getArrayDefinition().asThreeDimensionArray();
+				if (oneDimensionalArray != null) {
+					fieldNameDuplicate = items.getArrayDefinition().getField(fieldNameOccurance).getName();
+				}
+				if (twoDimensionalArray != null) {
+					int j = twoDimensionalArray.getArrayLength(1);
+					int k = fieldNameOccurance / j;
+					int l = (fieldNameOccurance) / j;
+					fieldNameDuplicate = twoDimensionalArray.get(k, l).getName();
+				}
+				if (threeDimensionalArray != null) {
+					int i = threeDimensionalArray.getArrayLength(1) * threeDimensionalArray.getArrayLength(2);
+					int j = threeDimensionalArray.getArrayLength(2);
+					int k = fieldNameOccurance / i;
+					int l = (fieldNameOccurance % i) / j;
+					int m = fieldNameOccurance % j;
+
+					fieldNameDuplicate = threeDimensionalArray.get(k, l, m).getName();
+
+				}
+
+				value = ab.getFieldValue(fieldNameDuplicate);
+			} else {
+				fieldDuplicates.put(fieldName, 0);
+
+				// if filename(1) exits
+				if (items.getItemType().isArray) {
+					String leafFieldName = items.getArrayDefinition().getField(0).getName();
+					value = ab.getFieldValue(leafFieldName);
+				} else {
+					value = ab.getFieldValue(fieldName);
+
+				}
+			}
+
+			// Append to Response JSON String
+			String fieldNameQuotes = String.format("\"%s\"", leavesMap.get(fieldName));
+			String valueAsString = getValuesString(value);
+
+			String valueQuotes = String.format("\"%s\"", JSONValue.escape(valueAsString));
+
+			if (asHexFieldsList != null && asHexFieldsList.contains(fieldName)) {
+				String realHexQuotes = String.format("\"%s\"", value.asHex());
+				responseString += String.format("%s:%s,", fieldNameQuotes, valueQuotes);
+
+			} else {
+				responseString += String.format("%s:%s", fieldNameQuotes, valueQuotes);
+			}
+		}
+		return responseString;
+
+	}
+
+	/************************************************************************************
+	 * CONVERT MAINFRAME COBOL VALUE TO STRING
+	 ************************************************************************************/
 
 	private String getValuesString(IFieldValue value) {
-		String valueType=value.getTypeName();
-		if((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMPU_3_5.equals(valueType))&& !value.isFieldPresent()) {
+		String valueType = value.getTypeName();
+		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMPU_3_5.equals(valueType))
+				&& !value.isFieldPresent()) {
 			return "";
-		}
-		else {
+		} else {
 			return value.asString();
 		}
-		}
+	}
 }
-
-
