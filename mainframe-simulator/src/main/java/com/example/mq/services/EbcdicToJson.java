@@ -361,11 +361,11 @@ public class EbcdicToJson {
 
 	private String getValuesString(IFieldValue value) {
 		String valueType = value.getTypeName();
-		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
-				&& !value.isFieldPresent()) {
-			return "";
-		} else {
-			return value.asString();
-		}
+//		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
+//				&& !value.isFieldPresent()) {
+//			return "";
+//		} else {
+		return value.asString();
+//		}
 	}
 }
