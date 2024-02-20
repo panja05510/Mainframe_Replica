@@ -30,6 +30,9 @@ public class EbcdicToJson {
 	private final String OPEN_BRACE = "{";
 	private final String CLOSE_BRACE = "{";
 	private final ResponseAbendError abendError;
+	public static final String COMP_3_4="140";
+	public static final String COMP_3_3="31";
+	public static final String COMP_3_5="141";
 
 	private EbcdicToJson(ResponseAbendError abendError) {
 		this.abendError = abendError;
@@ -361,11 +364,11 @@ public class EbcdicToJson {
 
 	private String getValuesString(IFieldValue value) {
 		String valueType = value.getTypeName();
-//		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
-//				&& !value.isFieldPresent()) {
-//			return "";
-//		} else {
+		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
+				&& !value.isFieldPresent()) {
+			return "";
+		} else {
 		return value.asString();
-//		}
+		}
 	}
 }
