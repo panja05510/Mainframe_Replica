@@ -8,6 +8,7 @@ public class MqDataApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(MqDataApplication.class, args);
+		System.out.println("spring project started at port : http://localhost:8080 ");
 	}
 
 }
