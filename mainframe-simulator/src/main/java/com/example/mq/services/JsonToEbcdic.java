@@ -1,6 +1,10 @@
 package com.example.mq.services;
 
 import com.ibm.as400.access.AS400PackedDecimal;
+import java.lang.reflect.Field;
+
+import ch.qos.logback.core.recovery.ResilientSyslogOutputStream;
+
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -13,6 +17,7 @@ import java.nio.charset.CharsetEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 import org.springframework.boot.autoconfigure.condition.ConditionMessage.ItemsBuilder;
 import org.springframework.core.io.ClassPathResource;
@@ -65,12 +70,23 @@ public class JsonToEbcdic {
 	
 	/************************************
 	* convert request to aminframe format (byte array)
+	 * @throws InterruptedException 
 	* **********************************/
 	
-	public byte[] request2mainframe(String copybook) {
+	public byte[] request2mainframe(String copybook) throws InterruptedException {
 		System.out.println("constcutor called");
 		ArrayList<HashMap<String,String>> intermediate_map = copybookToIntermediate(copybook);
-		return getFixedLengthOutput(intermediate_map);
+		System.out.println("request2mainframe()--> intermediate_map : "+ intermediate_map);
+		byte[] fixedLengthOutput = getFixedLengthOutput(intermediate_map);
+//		System.out.println("byte array is : "+ fixedLengthOutput);
+		printByteArray(fixedLengthOutput);
+		return fixedLengthOutput;
+	}
+	
+	public void printByteArray(byte[] arr) {
+		for(byte i : arr) {
+			System.out.println(i);
+		}
 	}
 	
 	/*************************************************************
@@ -84,71 +100,94 @@ public class JsonToEbcdic {
 			InputStream inputStream = resource.getInputStream();
 			ICobolIOBuilder iob = JRecordInterface1.COBOL.newIOBuilder(inputStream,copybookName);
 			RecordDetail record = iob.getLayout().getRecord(0);
+//			printObjectDetails(record);
+			System.out.println("copybookToIntermediate() --> record : "+record);
 			IItemDetails root = record.getCobolItems().get(0);
+			System.out.println("copybookToIntermediate() --> root : "+root.toString());
+//			printObjectDetails(root);
+//			Thread.sleep(100000);
 			return getIntermediateList(root,new ArrayList<>(), new HashMap<>());
 		}
 		catch(Exception e) {
 			System.out.println("error occured at JsonToEbcdic-->copybookToIntermedaite()" + e.getMessage());
-			return null; 
+			return null;  
 		}
 	}
+	
+	
+	public static void printObjectDetails(Object obj) {
+	    System.out.println("-----------------------------------------------------------");
+	    if (obj instanceof String) { // Direct handling for Strings
+	        System.out.println("Instance of String: " + obj);
+	    } else {
+	        Class<?> objClass = obj.getClass();
+	        System.out.println("Class Name: " + objClass.getName());
+	        Field[] fields = objClass.getDeclaredFields();
+
+	        for (Field field : fields) {
+	            field.setAccessible(true); // You might need this if fields are private
+	            try {
+	                System.out.println(field.getName() + ": " + field.get(obj));
+	            } catch (IllegalArgumentException | IllegalAccessException e) {
+	                System.out.println("Error getting field value: " + e.getMessage());
+	            }
+	        }
+	    }
+	    System.out.println("---------------------------------------------------------------");
+	}
+
 	
 	/*******************************************************************************************
 	*Recursive method to iterate through copybook tree and extract metadata for cobol variables
 	*each symbol leaf value will be stored in hashmap
 	*all hashmaps will go into arraylist
+	 * @throws InterruptedException 
 	*****************************************/
 	
-	public ArrayList<HashMap<String, String>> getIntermediateList(IItemDetails items, ArrayList<HashMap<String, String>> fields, HashMap<String, Integer> allNames)
-	{
-		if(items == null) {
-			return null;
-		}
-		
-		for(IItemDetails i : items.getChildItems()) {
-			String fieldName = i.getFieldName();
-			
-			if(i.isLeaf()) {
-				if(!i.isFieldRedefined()) {
-					if(i.isFieldRedefined()) {
-						fieldName = i.getRedefinesFieldName();
-					}
-					
-					if(!allNames.containsKey(fieldName))
-						allNames.put(fieldName, 0);
-					else {
-						int occurance = allNames.get(fieldName)+1;
-						allNames.put(fieldName, occurance);
-						fieldName = String.format("%s (%d)", fieldName, occurance);
-					}
-					
-					//if cobol variable has occurs value
-					if(i.getOccurs() > 1) {
-						
-						//add fieldname (k) to hashmap
-						for(int k=0; k<i.getOccurs(); k++) {
-							String fieldNameOccurance = String.format("%s (%d)", fieldName, k );
-							HashMap<String, String>  hm=getRecordHashMap(i,fieldNameOccurance);
-							fields.add(hm);
-						}
-					}
-					else {
-						HashMap<String, String> hm = getRecordHashMap(i,fieldName);
-						fields.add(hm);
-					}
-				}
-			}
-			else {
-				int occurs = i.getOccurs();
-				if(occurs < 0) occurs=1;
-				
-				for(int j = 0; j< occurs; j++) {
-					getIntermediateList(items, fields, allNames);
-				}
-			}
-		}
-		return fields;
+	public ArrayList<HashMap<String, String>> getIntermediateList(IItemDetails items, ArrayList<HashMap<String, String>> fields, HashMap<String, Integer> allNames) throws InterruptedException {
+	    if (items == null) {
+	        return null;
+	    }
+
+	    for (IItemDetails i : items.getChildItems()) {
+	        String fieldName = i.getFieldName();
+
+	        if (i.isLeaf()) {
+	            if (!i.isFieldRedefined()) {
+	                if (i.isFieldRedefined()) {
+	                    fieldName = i.getRedefinesFieldName();
+	                }
+
+	                if (!allNames.containsKey(fieldName)) {
+	                    allNames.put(fieldName, 0);
+	                } else {
+	                    int occurrence = allNames.get(fieldName) + 1;
+	                    allNames.put(fieldName, occurrence);
+	                    fieldName = String.format("%s (%d)", fieldName, occurrence);
+	                }
+
+	                HashMap<String, String> fieldData = getRecordHashMap(i, fieldName);
+	                fields.add(fieldData);
+	            }
+	        } else {
+	            int occurs = i.getOccurs();
+	            if (occurs < 0) {
+	                occurs = 1;
+	            }
+
+	            for (int j = 0; j < occurs; j++) {
+	                // Corrected recursive call: pass 'i' instead of 'items'
+	                getIntermediateList(i, fields, allNames);
+	            }
+	        }
+	    }
+	    System.out.println("fields are : "+ fields);
+//	    Thread.sleep(10000);
+	    return fields;
 	}
+
+
+
 	
 	/***********************************
 	*get cobol variable metadata as hashmap

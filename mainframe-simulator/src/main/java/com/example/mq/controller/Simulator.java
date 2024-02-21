@@ -17,7 +17,7 @@ public class Simulator {
 	private String cobolFile = "customer.cpy";
 	
 	@GetMapping("send")
-	public byte[] jsonToEbcdic() {
+	public byte[] jsonToEbcdic() throws InterruptedException {
 		return j2e.request2mainframe(cobolFile);
 	}
 	
