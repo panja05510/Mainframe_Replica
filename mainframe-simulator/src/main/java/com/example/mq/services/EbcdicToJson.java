@@ -41,7 +41,7 @@ public class EbcdicToJson {
 	/*******************************************************************
 	 * * CONVERT MAINFRAME TO JSON
 	 ******************************************************************/
-	public JsonObject mainframe2json(byte[] ebcdicBytes, ResponseBaseModel responseBaseModel) {
+	public JsonObject mainframe2json(byte[] ebcdicBytes,ResponseBaseModel responseBaseModel) {
 		try {
 			Map<String, Map<String, String>> copybooks = responseBaseModel.getCopybooks();
 			String ebcdicLength = Integer.toString(ebcdicBytes.length);

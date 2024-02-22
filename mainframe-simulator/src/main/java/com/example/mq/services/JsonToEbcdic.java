@@ -58,6 +58,7 @@ public class JsonToEbcdic {
 	
 	public static final String LATIN_1_CHARSET = "ISO-8859-1";
 	public static final String EBCDIC_CHARSET = String.format("CP%s", "500");
+	
 	private final HashMap<String, String> cobolNameValueMap;
 	private final List<String> leaveAsHexFieldnameList;
 	
@@ -66,7 +67,6 @@ public class JsonToEbcdic {
 		this.cobolNameValueMap = cobolNameValueMap;
 		this.leaveAsHexFieldnameList = leaveAsHexFieldnameList;
 	}
-	
 	
 	/************************************
 	* convert request to aminframe format (byte array)
@@ -79,8 +79,15 @@ public class JsonToEbcdic {
 		System.out.println("request2mainframe()--> intermediate_map : "+ intermediate_map);
 		byte[] fixedLengthOutput = getFixedLengthOutput(intermediate_map);
 //		System.out.println("byte array is : "+ fixedLengthOutput);
-		printByteArray(fixedLengthOutput);
+//		printByteArray(fixedLengthOutput);
+		showbytesToString(fixedLengthOutput);
 		return fixedLengthOutput;
+	}
+	
+	public void showbytesToString(byte[] arr) {
+		String asciiData = new String(arr, Charset.forName(EBCDIC_CHARSET));
+		System.out.println("length of response is : "+ arr.length);
+		System.out.println("data from jargon is : "+ asciiData + "/////////////////////////////");
 	}
 	
 	public void printByteArray(byte[] arr) {
@@ -125,7 +132,7 @@ public class JsonToEbcdic {
 	        Field[] fields = objClass.getDeclaredFields();
 
 	        for (Field field : fields) {
-	            field.setAccessible(true); // You might need this if fields are private
+	            field.setAccessible(true); // if fields are private
 	            try {
 	                System.out.println(field.getName() + ": " + field.get(obj));
 	            } catch (IllegalArgumentException | IllegalAccessException e) {
@@ -150,6 +157,7 @@ public class JsonToEbcdic {
 	    }
 
 	    for (IItemDetails i : items.getChildItems()) {
+	    	printObjectDetails(i);
 	        String fieldName = i.getFieldName();
 
 	        if (i.isLeaf()) {
