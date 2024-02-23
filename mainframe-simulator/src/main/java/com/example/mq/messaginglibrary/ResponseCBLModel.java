@@ -12,6 +12,7 @@ public class ResponseCBLModel implements Serializable {
 
 private Map<String, String> leaves;
 private List<String> parents;
+private List<String> hexFields;
 
 public Map<String, String> getLeaves() {
 	return leaves;
@@ -37,7 +38,7 @@ public void setHexFields(List<String> hexFields) {
 	this.hexFields = hexFields;
 }
 
-private List<String> hexFields;
+
 
 @Override
 

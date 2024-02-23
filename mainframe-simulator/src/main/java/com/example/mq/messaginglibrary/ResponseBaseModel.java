@@ -2,13 +2,13 @@ package com.example.mq.messaginglibrary;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
 import java.util.Map;
 
 @Component
+@ConfigurationProperties("savingsclosingbalancequeryresponse")
 public class ResponseBaseModel implements Serializable {
 
 private String apiName;
@@ -79,6 +79,6 @@ public void setMfResponseValuesMapping(Map<String, Map<String, String>> mfRespon
 
 @Override
 public String toString() {
-return String.format("%s, %s, %s)", this.getResourceName(), this.getQueue());
+return String.format("%s, %s, %s)", this.getResourceName(), this.getQueue(), this.getApiName());
 }
 }

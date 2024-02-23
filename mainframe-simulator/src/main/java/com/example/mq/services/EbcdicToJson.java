@@ -20,15 +20,18 @@ import net.sf.JRecord.detailsBasic.IItemDetails;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Service
 public class EbcdicToJson {
 
 	private final String OPEN_BRACE = "{";
-	private final String CLOSE_BRACE = "{";
+	private final String CLOSE_BRACE = "}";
 	private final ResponseAbendError abendError;
 	public static final String COMP_3_4="140";
 	public static final String COMP_3_3="31";
@@ -41,24 +44,35 @@ public class EbcdicToJson {
 	/*******************************************************************
 	 * * CONVERT MAINFRAME TO JSON
 	 ******************************************************************/
-	public JsonObject mainframe2json(byte[] ebcdicBytes, ResponseBaseModel responseBaseModel) {
+	public JsonObject mainframe2json(byte[] ebcdicBytes,ResponseBaseModel responseBaseModel) {
 		try {
+			
 			Map<String, Map<String, String>> copybooks = responseBaseModel.getCopybooks();
 			String ebcdicLength = Integer.toString(ebcdicBytes.length);
+			System.out.println("length of ebcdicBytes--->"+ebcdicLength);
 			String copybookName = getCopybookName(ebcdicLength, copybooks);
-
+			System.out.println(copybookName);
 			Resource resource = new ClassPathResource(copybookName);
+			System.out.println(resource);
 			InputStream inputStream = resource.getInputStream();
+			System.out.println(inputStream);
 			ICobolIOBuilder iob = JRecordInterface1.COBOL.newIOBuilder(inputStream, copybookName).setFont("CP500");
 			AbstractLine line = iob.newLine(ebcdicBytes);
 			LayoutDetail layout = iob.getLayout();
 			RecordDetail record = layout.getRecord(0);
 			IItemDetails root = record.getCobolItems().get(0);
+			System.out.println(ebcdicLength);
+			System.out.println(copybooks);
+			System.out.println(root);
+			System.out.println(layout);
+			System.out.println("line --> " + line);
+			System.out.println("Response: " + responseBaseModel);
 			JsonObject responseOrError = getResponseOrError(ebcdicLength, copybooks, root, layout, line,
 					responseBaseModel);
+			
 			return responseOrError;
 		} catch (Exception e) {
-			System.err.println("error accured during parsing Ebcdic To JSON :");
+			System.err.println("error accured during parsing Ebcdic To JSON :"+e);
 			return null;
 
 		}
@@ -71,45 +85,74 @@ public class EbcdicToJson {
 
 	private JsonObject getResponseOrError(String ebcdicLength, Map<String, Map<String, String>> copybooks,
 			IItemDetails root, LayoutDetail layout, AbstractLine line, ResponseBaseModel responseBaseModel) {
+		System.out.println(responseBaseModel.getCobolfieldsmap());
 		ResponseCBLModel rcm = responseBaseModel.getCobolfieldsmap();
+		System.out.println(rcm.getLeaves());
 		Map<String, String> leavesMap = rcm.getLeaves();
+		System.out.println(rcm.getParents());
 		List<String> parentsFieldsList = rcm.getParents();
+		System.out.println(rcm.getHexFields());
 		List<String> asHexFieldsList = rcm.getHexFields();
+		System.out.println("after hexfields");
 
 		JsonObject response = new JsonObject();
+		
 		JsonObject error;
-		String responseType = copybooks.get(ebcdicLength).get("responseType");
-
+//		System.out.println("Before");
+//		System.out.println(copybooks.get(ebcdicLength));
+		//System.out.println("before call");
+		
+	
+		
+		String responseType = copybooks.get("default").get("responseType");
+		
+		
+		
+		
+		
 		if (copybooks.containsKey(ebcdicLength)) {
+			System.out.println("entering into if (copybooks.containsKey(ebcdicLength)) ");
 			responseType = copybooks.get(ebcdicLength).get("responseType");
+			System.out.println("response type -->"+responseType);
 		}
 //		
 
 		ResponseErrorModel responseErrorModel = responseBaseModel.getError();
 		final var returnCode = "returnCode";
 		Map<String, String> errorFields = responseErrorModel.getErrorFieldnameMapping();
+		
+		System.out.println("error fields --> :"+errorFields);
 
 		if (errorFields.containsKey(returnCode) && layout.getFieldNameMap().containsKey(errorFields.get(returnCode))) {
 			if ("0".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
+				System.out.println("returnType : success");
 				responseType = "success";
 
 			} else if ("2".equals(line.getFieldValue(errorFields.get(returnCode)).asString())) {
+				System.out.println("returnType : failure");
 				responseType = "error";
 			}
 		}
-		// ABEND errors
+		// ABEND 
+System.out.println("before checking abendError");
+abendError.setCopybookLength("680");
+System.out.println(abendError.getCopybookLength());
 		if (ebcdicLength.equals(abendError.getCopybookLength())) {
+			System.out.println("entered equals getCopybookLength");
+			
 			error = getAbendErrorPayload(layout, line);
 			response.add("error", error);
 		}
 		// if response type contains error it calls responseErrorFormatter service and
 		// allocates TSMDA Errors
 		else if (responseType.equals("error")) { // TSMDA errors
+			System.out.println("entering response type error");
 			if (errorFields.containsKey("messageSeverity")
 					&& layout.getFieldNameMap().containsKey(errorFields.get("messageSeverity"))) {
+				System.out.println("inside if of response type error");
 				String mfResponseVal = line.getFieldValue(errorFields.get("messageSeverity")).asString();
 				if (StringUtils.equalsIgnoreCase("I", mfResponseVal)) {
-					response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root, layout, line);
+					response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root,  line);
 
 				} else {
 					error = getTSMDAErrorPayload(layout, line, responseBaseModel);
@@ -119,8 +162,12 @@ public class EbcdicToJson {
 				error = getTSMDAErrorPayload(layout, line, responseBaseModel);
 				response.add("error", error);
 			}
-		} else
-			response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root, layout, line);
+		} else {
+			
+		System.out.println("in getresponse or error entering last else");
+			response = getResponseJson(leavesMap, parentsFieldsList, asHexFieldsList, root, line);
+		}
+		System.out.println(response);
 		return response;
 	}
 
@@ -144,15 +191,23 @@ public class EbcdicToJson {
 	 *****************************************************************************************/
 
 	public JsonObject getResponseJson(Map<String, String> leavesMap, List<String> parentsFieldsList,
-			List<String> asHexFieldsList, IItemDetails item, LayoutDetail layout, AbstractLine line) {
+			List<String> asHexFieldsList, IItemDetails item,  AbstractLine line) {
 		try {
 			HashMap<String, Integer> fieldNameOccuranceMap = new HashMap<>();
 			String res = OPEN_BRACE + parseRecordBinary(leavesMap, parentsFieldsList, asHexFieldsList, item,
 					fieldNameOccuranceMap, line) + CLOSE_BRACE;
+			System.out.println("In getResponseJson --> result : res-->"+res);
 			res = correctResponseString(res);
+			System.out.println("result: res-->"+res);
+			System.out.println("error in parsing string to json");
+			System.out.println(JsonParser.parseString(res).isJsonObject());
+			
+			System.out.println(JsonParser.parseString(res).getAsJsonObject());
+			
+			System.out.println("error here");
 			return JsonParser.parseString(res).getAsJsonObject();
 		} catch (Exception e) {
-			System.err.println("error during parsing Json Message");
+			System.err.println(e.getMessage());
 			return null;
 
 		}
@@ -165,21 +220,28 @@ public class EbcdicToJson {
 			List<String> asHexFieldsList, IItemDetails items, HashMap<String, Integer> fieldDuplicates,
 			AbstractLine ab) {
 
-		if (items == null)
+		if (items == null) {
+			System.out.println("parseRecordBinary--> items is null");
 			return null;
+		}
 		StringBuilder responseString = new StringBuilder();
 		if (items.getChildItems() != null && items.getChildItems().size() > 0) {
+			System.out.println(" entering 1st if items.getChildItems");
 			for (IItemDetails i : items.getChildItems()) {
 				String fieldName = i.getFieldName();
 
 				// If IItemsDetails i is leaves
 				if (i.isLeaf() && !(parentsFieldsList.contains(fieldName))) {
+					System.out.println("parseecordBinary--> entered 1st if");
+					
 					responseString = new StringBuilder(getDuplicateFieldValues(leavesMap, i, fieldName, fieldDuplicates,
 							ab, responseString.toString(), asHexFieldsList));
 				}
 
 				else {
+					System.out.println("parseecordBinary--> entered 1st else");
 					if (parentsFieldsList.contains(fieldName)) {
+						System.out.println("parseecordBinary--> entered 1st else and if");
 
 						// add below to response object string
 						// parent_1{idx}
@@ -201,16 +263,21 @@ public class EbcdicToJson {
 						String CLOSE_BRACKET = "]";
 						responseString.append(CLOSE_BRACKET).append(",");
 
-					} else
+					} else {
+						System.out.println("parseRecord binary -->entering else else ");
 						responseString.append(parseRecordBinary(leavesMap, parentsFieldsList, asHexFieldsList, i,
-								fieldDuplicates, ab));
+								fieldDuplicates, ab));}
+					System.out.println("ParseRecord binary responseString is --> "+responseString);
+					
 
 				}
 			}
 		} else {
+			System.out.println("parseecordBinary--> entered 1st else of if");
 			String fieldName = items.getFieldName();
 			responseString = new StringBuilder(getDuplicateFieldValues(leavesMap, items, fieldName, fieldDuplicates, ab,
 					responseString.toString(), asHexFieldsList));
+			System.out.println("in parserRecordBinary -->"+responseString);
 		}
 		return responseString.toString();
 	}
@@ -282,6 +349,7 @@ public class EbcdicToJson {
 	public String correctResponseString(String jsonStringToCorrect) {
 		jsonStringToCorrect = jsonStringToCorrect.replaceAll(",}", "}");
 		jsonStringToCorrect = jsonStringToCorrect.replaceAll(",]", "]");
+		jsonStringToCorrect = jsonStringToCorrect.replaceAll("\"\"","\",\"");
 		return jsonStringToCorrect;
 	}
 
@@ -293,12 +361,14 @@ public class EbcdicToJson {
 			HashMap<String, Integer> fieldDuplicates, AbstractLine ab, String responseString,
 			List<String> asHexFieldsList) {
 		if (leavesMap.containsKey(fieldName)) {
+			System.out.println("getDuplicateFieldValues--->1st if ");
 
 			IFieldValue value;
 			String fieldNameDuplicate = null;
 
 			// if fieldname has already been added to map, increase occurance by 1
 			if (fieldDuplicates.containsKey(fieldName)) {
+				System.out.println("getDuplicateFieldValues--->2st if ");
 				int fieldNameOccurance = fieldDuplicates.get(fieldName) + 1;
 				fieldDuplicates.put(fieldName, fieldNameOccurance);
 
@@ -307,15 +377,18 @@ public class EbcdicToJson {
 				IArray1Dimension oneDimensionalArray = items.getArrayDefinition().asOneDimensionArray();
 				IArray3Dimension threeDimensionalArray = items.getArrayDefinition().asThreeDimensionArray();
 				if (oneDimensionalArray != null) {
+					System.out.println("getDuplicateFieldValues--->contains 1DArray ");
 					fieldNameDuplicate = items.getArrayDefinition().getField(fieldNameOccurance).getName();
 				}
 				if (twoDimensionalArray != null) {
+					System.out.println("getDuplicateFieldValues--->contains 2DArray ");
 					int j = twoDimensionalArray.getArrayLength(1);
 					int k = fieldNameOccurance / j;
 					int l = (fieldNameOccurance) / j;
 					fieldNameDuplicate = twoDimensionalArray.get(k, l).getName();
 				}
 				if (threeDimensionalArray != null) {
+					System.out.println("getDuplicateFieldValues--->contains 3DArray ");
 					int i = threeDimensionalArray.getArrayLength(1) * threeDimensionalArray.getArrayLength(2);
 					int j = threeDimensionalArray.getArrayLength(2);
 					int k = fieldNameOccurance / i;
@@ -328,14 +401,18 @@ public class EbcdicToJson {
 
 				value = ab.getFieldValue(fieldNameDuplicate);
 			} else {
+				System.out.println("getDuplicateFieldValues--->entering second else ");
 				fieldDuplicates.put(fieldName, 0);
 
 				// if filename(1) exits
 				if (items.getItemType().isArray) {
+					System.out.println("getDuplicateFieldValues--->entering second else 1st if ");
 					String leafFieldName = items.getArrayDefinition().getField(0).getName();
 					value = ab.getFieldValue(leafFieldName);
 				} else {
+					System.out.println("getDuplicateFieldValues--->entering second else and else ");
 					value = ab.getFieldValue(fieldName);
+					System.out.println("getDuplicateFieldValues--->entering second else and else: value" +fieldName );
 
 				}
 			}
@@ -347,13 +424,18 @@ public class EbcdicToJson {
 			String valueQuotes = String.format("\"%s\"", JSONValue.escape(valueAsString));
 
 			if (asHexFieldsList != null && asHexFieldsList.contains(fieldName)) {
+				System.out.println("getDuplicateFieldValues--->entering 1st if if ");
 				String realHexQuotes = String.format("\"%s\"", value.asHex());
 				responseString += String.format("%s:%s,", fieldNameQuotes, valueQuotes);
 
 			} else {
+				System.out.println("getDuplicateFieldValues--->entering 1st if else : fieldNameQuotes"+fieldNameQuotes);
+				System.out.println("getDuplicateFieldValues--->entering 1st if else : valueQuotes"+ valueQuotes);
 				responseString += String.format("%s:%s", fieldNameQuotes, valueQuotes);
+				System.out.println("getDuplicateFieldValues--->entering 1st if else ");
 			}
 		}
+		System.out.println(responseString);
 		return responseString;
 
 	}
@@ -366,8 +448,10 @@ public class EbcdicToJson {
 		String valueType = value.getTypeName();
 		if ((COMP_3_4.equals(valueType) || COMP_3_3.equals(valueType) || COMP_3_5.equals(valueType))
 				&& !value.isFieldPresent()) {
+			System.out.println("getValuesString--> if block:"+valueType);
 			return "";
 		} else {
+			System.out.println("getValuesString-->"+value.asString());
 		return value.asString();
 		}
 	}
